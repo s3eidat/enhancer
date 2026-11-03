@@ -69,9 +69,10 @@ def suggest(rgb: np.ndarray, rt: Runtime | None = None) -> dict:
     if rt is not None and rt.catalog.available("yunet") and rt.catalog.available("gfpgan-1.4"):
         faces = FaceDetector(rt).detect(rgb)
         if faces:
-            biggest = max(f.eye_dist for f in faces) * s["upscale"]
-            # big, clean faces only lose real detail to face recovery; small or noisy ones gain the most
-            s["faces"] = 0.8 if biggest < 90 or sigma >= 4 else 0.5 if biggest < 160 else 0.0
+            biggest = max(f.eye_dist for f in faces)
+            # GFPGAN works at ~126px between the eyes. Faces smaller than that in the source gain real
+            # detail; big, clean faces only lose some of theirs.
+            s["faces"] = 0.8 if biggest < 130 or sigma >= 6 else 0.5 if biggest < 200 else 0.0
             reasons.append(f"Faces {int(s['faces'] * 100)}%: {len(faces)} found, "
                            + ("small or noisy" if s["faces"] >= 0.8 else "medium" if s["faces"] else "already detailed"))
         else:

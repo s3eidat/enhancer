@@ -35,6 +35,7 @@ class Runtime:
         self.notice = "" if self.use_gpu or device == "cpu" else "No DirectML GPU found, running on the CPU."
         self._sessions: OrderedDict[tuple[str, bool], ort.InferenceSession] = OrderedDict()
         self._lock = threading.Lock()
+        self._run_lock = threading.Lock()  # one model call at a time: the queue and live previews share the GPU
 
     @property
     def device_name(self) -> str:
@@ -87,7 +88,8 @@ class Runtime:
     def run(self, mid: str, x: np.ndarray) -> np.ndarray:
         """x: (N,3,h,w) float32 in [0,1] -> float32 output."""
         sess = self.session(mid)
-        out = sess.run(None, {"input": np.ascontiguousarray(x, dtype=np.float32)})[0]
+        with self._run_lock:
+            out = sess.run(None, {"input": np.ascontiguousarray(x, dtype=np.float32)})[0]
         return out.astype(np.float32, copy=False)
 
     def fn(self, mid: str):

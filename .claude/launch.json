@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "enhancer-browser",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "enhancer", "--browser", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}
