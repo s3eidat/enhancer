@@ -67,6 +67,7 @@ class Api:
 
     def ready(self) -> dict:
         a = self._app
+        log.info("UI loaded (%s)", a.rt.device_name)
         rt = a.rt
         return {"version": __version__, "name": APP_NAME, "device": rt.device_name, "gpu": rt.use_gpu,
                 "notice": rt.notice, "settings": Settings.from_dict(a.prefs.data.get("settings")).to_dict(),
