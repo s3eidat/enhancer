@@ -53,16 +53,20 @@ def resize(img: np.ndarray, w: int, h: int) -> np.ndarray:
     return cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA if down else cv2.INTER_CUBIC)
 
 
+def nafnet(rt: Runtime, task: str, quality: str) -> str:
+    """The width-64 model when asked for and downloaded, else the width-32 one (part of the essential download)."""
+    best, fast = f"nafnet-{task}-64", f"nafnet-{task}-32"
+    return best if quality == "best" and rt.catalog.available(best) else fast
+
+
 def denoise(rt: Runtime, img: np.ndarray, strength: float, quality: str = "best",
             progress: Progress = None, cancel: Cancel = None) -> np.ndarray:
-    mid = "nafnet-denoise-64" if quality == "best" else "nafnet-denoise-32"
-    return blend(img, tiled(rt, mid, img, progress, cancel), strength)
+    return blend(img, tiled(rt, nafnet(rt, "denoise", quality), img, progress, cancel), strength)
 
 
 def sharpen(rt: Runtime, img: np.ndarray, strength: float, quality: str = "best",
             progress: Progress = None, cancel: Cancel = None) -> np.ndarray:
-    mid = "nafnet-deblur-64" if quality == "best" else "nafnet-deblur-32"
-    return blend(img, tiled(rt, mid, img, progress, cancel), strength)
+    return blend(img, tiled(rt, nafnet(rt, "deblur", quality), img, progress, cancel), strength)
 
 
 def upscale(rt: Runtime, img: np.ndarray, scale: int, mode: str = "standard", detail: float = 1.0,

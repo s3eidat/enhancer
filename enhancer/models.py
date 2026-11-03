@@ -16,7 +16,7 @@ class MissingModel(RuntimeError):
 @dataclass(frozen=True)
 class ModelInfo:
     id: str
-    kind: str          # upscale | denoise | sharpen | face | detect
+    kind: str          # upscale | denoise | sharpen | face | detect | interp
     scale: int
     multiple: int      # input H and W must be divisible by this
     fixed: int | None  # fixed square input size (faces), else dynamic

@@ -320,7 +320,7 @@ function showNotice(msg) { $("notice").hidden = !msg; $("notice").textContent = 
 
 function showEmpty() {
   V.mode = "empty";
-  $("viewerHint").hidden = false; $("divider").hidden = true; $("tagBefore").hidden = $("tagAfter").hidden = true;
+  $("viewerHint").hidden = !!(state.info && state.info.models.missing.length); $("divider").hidden = true; $("tagBefore").hidden = $("tagAfter").hidden = true;
   $("imgBefore").removeAttribute("src"); $("imgAfter").removeAttribute("src");
   $("liveBar").hidden = true; $("clickTip").hidden = true; $("scrub").hidden = true;
   $("stageTitle").textContent = "Nothing selected"; $("stageInfo").textContent = "";
@@ -501,21 +501,65 @@ function bindDrop() {
   window.onFilesDropped = (paths) => addFiles(paths);
 }
 
-/* ---------- start ---------- */
-async function start() {
-  const info = await call("ready");
-  state.info = info; state.settings = info.settings; state.outDir = info.out_dir;
+/* ---------- first run: models ---------- */
+const fmtMB = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`);
+
+function applyInfo(info) {
+  state.info = info;
   $("ver").textContent = `v${info.version}`;
   $("device").textContent = info.gpu ? "GPU · DirectML" : "CPU";
   $("device").classList.toggle("gpu", info.gpu);
   showNotice(info.notice);
-  if (!info.faces_available) { $("facesRow").classList.add("disabled"); $("faces").disabled = true; state.settings.faces = 0; }
-  const ul = $("creditList");
+  $("facesRow").classList.toggle("disabled", !info.faces_available); $("faces").disabled = !info.faces_available;
+  if (!info.faces_available) state.settings.faces = 0;
+  const ul = $("creditList"); ul.innerHTML = "";
   for (const c of info.credits) {
     const li = el("li"); li.append(el("b", null, c.credit), el("span", "lic", `${c.license} · ${c.project}`));
     if (c.note) li.append(el("div", "note", c.note));
     ul.append(li);
   }
+  $("modelFolder").textContent = `Models folder: ${info.models.folder}`;
+  $("getBest").hidden = !info.models.best_missing.length || !!info.models.missing.length;
+  const need = info.models.missing.length > 0;
+  $("setup").hidden = !need;
+  if (need) $("viewerHint").hidden = true; else if (state.view.mode === "empty") $("viewerHint").hidden = false;
+  $("setupSize").textContent = fmtMB(info.models.missing_bytes);
+  $("setupBestSize").textContent = fmtMB(info.models.best_bytes);
+  $("setupBestRow").hidden = !info.models.best_missing.length;
+  const bestNaf = !info.models.best_missing.some((m) => m.startsWith("nafnet"));
+  const bestBtn = $("qualitySeg").querySelector('[data-v="best"]');
+  bestBtn.disabled = !bestNaf;
+  bestBtn.title = bestNaf ? "" : "Get the best-quality models in Models & licenses";
+  if (!bestNaf) state.settings.quality = "fast";
+  $("addBtn").disabled = need;
+}
+
+async function startDownload(best) {
+  $("setupBtn").disabled = true; $("getBest").disabled = true;
+  $("setup").hidden = false; $("viewerHint").hidden = true;
+  await call("start_download", best);
+  pollDownload();
+}
+
+async function pollDownload() {
+  const d = await call("download_state");
+  $("setupBarWrap").hidden = false;
+  $("setupBar").style.width = d.total ? pct(d.done / d.total) : "0%";
+  $("setupText").textContent = d.running ? `${fmtMB(d.done)} of ${fmtMB(d.total)} · ${d.model}` : d.error;
+  if (d.running) { setTimeout(pollDownload, 400); return; }
+  $("setupBtn").disabled = false; $("getBest").disabled = false;
+  if (d.error) toast(d.error);
+  applyInfo(await call("ready"));
+  renderSettings();
+}
+
+/* ---------- start ---------- */
+async function start() {
+  const info = await call("ready");
+  state.settings = info.settings; state.outDir = info.out_dir;
+  applyInfo(info);
+  $("setupBtn").addEventListener("click", () => startDownload($("setupBest").checked));
+  $("getBest").addEventListener("click", () => { $("credits").close(); startDownload(true); });
   $("creditsBtn").addEventListener("click", () => $("credits").showModal());
   const pick = async () => addFiles(await call("pick_files"));
   $("addBtn").addEventListener("click", pick); $("addBtn2").addEventListener("click", pick);

@@ -10,3 +10,4 @@ Import lines were pointed at `_shim.py`; `NAFNetLocal` (TLC) was removed. Otherw
 | NAFNet_arch.py | github.com/megvii-research/NAFNet | MIT |
 | gfpganv1_clean_arch.py, stylegan2_clean_arch.py | github.com/TencentARC/GFPGAN (clean arch, no NVIDIA CUDA ops) | Apache-2.0 |
 | _shim.py | helpers after BasicSR (Apache-2.0) and NAFNet (MIT) | same |
+| rife_ifnet_arch.py | github.com/hzwer/Practical-RIFE (4.25 model zip, IFNet_HDv3.py); warp rebuilt for ONNX export | MIT |

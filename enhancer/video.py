@@ -45,10 +45,10 @@ def is_video(path: str | Path) -> bool:
 
 # -- ffmpeg -------------------------------------------------------------------
 def ffmpeg_path(tool: str = "ffmpeg") -> str | None:
-    """ENHANCER_FFMPEG (folder or exe), then PATH, then C:/ffmpeg/*/bin, then the app's data folder."""
+    """The bundled copy (frozen build), ENHANCER_FFMPEG (folder or exe), PATH, C:/ffmpeg/*/bin, the data folder."""
     exe = tool + (".exe" if os.name == "nt" else "")
     env = os.environ.get("ENHANCER_FFMPEG")
-    cands = []
+    cands = [paths.PKG.parent / "bin" / exe] if paths.FROZEN else []  # the copy shipped with the app
     if env:
         p = Path(env)
         cands.append(p.parent / exe if p.is_file() else p / exe)

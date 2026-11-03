@@ -14,6 +14,7 @@ from collections import OrderedDict
 import numpy as np
 import onnxruntime as ort
 
+from . import paths
 from .models import Catalog, MissingModel
 
 log = logging.getLogger(__name__)
@@ -45,7 +46,8 @@ class Runtime:
         info = self.catalog.get(mid)
         path = info.path("fp32", self.catalog.root)
         if not path.exists():
-            raise MissingModel(f"Model file missing: {path}. Run tools/convert/convert.py or download the models.")
+            how = "Open Models & licenses to download it." if paths.FROZEN else "Run tools/convert/convert.py."
+            raise MissingModel(f"The {mid} model is not downloaded yet ({path.name}). {how}")
         so = ort.SessionOptions()
         so.log_severity_level = 3
         if gpu:

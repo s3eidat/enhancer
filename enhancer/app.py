@@ -15,9 +15,10 @@ from pathlib import Path
 
 import numpy as np
 
-from . import APP_NAME, __version__, imageio, paths, video
+from . import APP_NAME, __version__, download, imageio, paths, video
 from .autopilot import suggest
 from .jobs import JobQueue
+from .models import Catalog
 from .ops import resize
 from .pipeline import Settings, process
 from .runtime import Runtime
@@ -72,15 +73,16 @@ class Api:
     def ready(self) -> dict:
         a = self._app
         log.info("UI loaded (%s)", a.rt.device_name)
-        rt = a.rt
-        return {"version": __version__, "name": APP_NAME, "device": rt.device_name, "gpu": rt.use_gpu,
-                "notice": rt.notice, "settings": Settings.from_dict(a.prefs.data.get("settings")).to_dict(),
-                "out_dir": a.prefs.data.get("out_dir") or str(paths.default_output_dir()),
-                "formats": list(imageio.FORMATS), "credits": rt.catalog.credits(),
-                "faces_available": rt.catalog.available("gfpgan-1.4") and rt.catalog.available("yunet"),
-                "exts": sorted(imageio.INPUT_EXTS), "video_exts": sorted(video.VIDEO_EXTS),
-                "ffmpeg": video.ffmpeg_path() is not None,
-                "interp_available": rt.catalog.available("rife-4.25") and rt.catalog.available("rife-4.25-uhd")}
+        return a.info()
+
+    def start_download(self, best: bool = False) -> dict:
+        return self._app.start_download(best)
+
+    def download_state(self) -> dict:
+        return dict(self._app.dl)
+
+    def cancel_download(self) -> None:
+        self._app.dl["cancel"] = True
 
     def pick_files(self) -> list[str]:
         if self._app.window is None:
@@ -188,7 +190,11 @@ class Api:
 class EnhancerApp:
     def __init__(self, device: str = "auto", port: int = 0):
         self.prefs = Prefs()
+        if paths.FROZEN:  # the app ships the manifest; the models themselves live in the data folder
+            download.install_manifest(paths.PKG.parent / "models" / "manifest.json", paths.models_dir())
         self.rt = Runtime(device=device)
+        log.info("models in %s, ffmpeg %s", self.rt.catalog.root, video.ffmpeg_path())
+        self.dl = {"running": False, "done": 0, "total": 0, "model": "", "error": "", "cancel": False}
         self.preview_dir = paths.data_dir() / "previews"
         self.preview_dir.mkdir(parents=True, exist_ok=True)
         for old in self.preview_dir.glob("*"):
@@ -200,6 +206,47 @@ class EnhancerApp:
         self._cache_lock = threading.Lock()
         self.frame_time: dict[Path, float] = {}  # video -> time of the frame shown and previewed
         self._vinfo: dict[Path, video.VideoInfo] = {}
+
+    def info(self) -> dict:
+        rt = self.rt
+        cat = rt.catalog
+        need, best = download.missing(cat, download.ESSENTIAL), download.missing(cat, download.BEST)
+        return {"version": __version__, "name": APP_NAME, "device": rt.device_name, "gpu": rt.use_gpu,
+                "notice": rt.notice, "settings": Settings.from_dict(self.prefs.data.get("settings")).to_dict(),
+                "out_dir": self.prefs.data.get("out_dir") or str(paths.default_output_dir()),
+                "formats": list(imageio.FORMATS), "credits": cat.credits(),
+                "faces_available": cat.available("gfpgan-1.4") and cat.available("yunet"),
+                "exts": sorted(imageio.INPUT_EXTS), "video_exts": sorted(video.VIDEO_EXTS),
+                "ffmpeg": video.ffmpeg_path() is not None,
+                "interp_available": cat.available("rife-4.25") and cat.available("rife-4.25-uhd"),
+                "models": {"missing": need, "missing_bytes": download.size_of(cat, need),
+                           "best_missing": best, "best_bytes": download.size_of(cat, best),
+                           "folder": str(cat.root)}}
+
+    def start_download(self, best: bool = False) -> dict:
+        if self.dl["running"]:
+            return dict(self.dl)
+        ids = download.ESSENTIAL + (download.BEST if best else [])
+        self.dl.update(running=True, done=0, total=download.size_of(self.rt.catalog, download.missing(
+            self.rt.catalog, ids)), model="", error="", cancel=False)
+
+        def work():
+            try:
+                download.download(self.rt.catalog, ids,
+                                  lambda d, t, m: self.dl.update(done=d, total=t, model=m),
+                                  lambda: self.dl["cancel"])
+            except download.Cancelled:
+                self.dl["error"] = "Download cancelled."
+            except Exception as e:
+                log.exception("model download failed")
+                self.dl["error"] = f"Download failed: {e}"
+            finally:
+                self.rt.catalog = Catalog(self.rt.catalog.root)
+                self.rt.release()
+                self.dl["running"] = False
+
+        threading.Thread(target=work, name="models", daemon=True).start()
+        return dict(self.dl)
 
     def video_info(self, p: Path) -> video.VideoInfo:
         if p not in self._vinfo:

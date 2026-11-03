@@ -60,6 +60,14 @@
         <p>Upscale 2×/4×, remove noise, sharpen, recover faces and smooth video to 60 fps, on your own GPU, for free.</p>
         <button id="addBtn2">Choose files</button>
       </div>
+      <div class="setup" id="setup" hidden>
+        <h3>One more step: the AI models</h3>
+        <p>The app downloads its open AI models once (<b id="setupSize"></b>). Each file is checked after download and kept on this PC, so everything after this works offline.</p>
+        <label class="check" id="setupBestRow"><input type="checkbox" id="setupBest"> Also the best-quality noise, sharpen and face models (+<span id="setupBestSize"></span>)</label>
+        <button id="setupBtn">Download models</button>
+        <div class="setup-bar" id="setupBarWrap" hidden><i id="setupBar"></i></div>
+        <div class="muted small-text" id="setupText"></div>
+      </div>
       <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyText">Working…</span></div>
       <div class="live-bar" id="liveBar" hidden>
         <span id="liveText">Preview</span>
@@ -163,7 +171,8 @@
   <h3>Models &amp; licenses</h3>
   <p class="muted">Every model runs on this PC. They are open models with licenses that allow free use; their authors are credited below.</p>
   <ul id="creditList"></ul>
-  <form method="dialog"><button>Close</button></form>
+  <p class="muted small-text" id="modelFolder"></p>
+  <form method="dialog" class="row between"><button type="button" class="ghost" id="getBest" hidden>Get best-quality models</button><button>Close</button></form>
 </dialog>
 
 <script src="app.js"></script>
