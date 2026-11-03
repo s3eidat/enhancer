@@ -1,0 +1,69 @@
+{
+  "models": {
+    "realesr-general-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "license": "BSD-3-Clause",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "file": "realesr-general-x4.onnx",
+      "bytes": 2451223,
+      "sha256": "487dba65c2758271952cba40c105439b5cd68772926e416526160c6a6b25fdb1",
+      "channels": 3,
+      "max_diff_vs_fp32": 0.0007395744323730469
+    },
+    "realesrgan-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "license": "BSD-3-Clause",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "file": "realesrgan-x4.onnx",
+      "bytes": 33723583,
+      "sha256": "f3662d966707aeb717e1486b3902b7691104f9204592ae418b0475bceb8cfd60",
+      "channels": 3,
+      "max_diff_vs_fp32": 0.000823676586151123
+    },
+    "realesrgan-anime-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "license": "BSD-3-Clause",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "file": "realesrgan-anime-x4.onnx",
+      "bytes": 9022830,
+      "sha256": "a2b285873cf2a7a2c1f5f631d9b4723a82496681329ca2b36ccd1b4a6de9a1b4",
+      "channels": 3,
+      "max_diff_vs_fp32": 0.0018763244152069092
+    },
+    "nafnet-denoise-32": {
+      "kind": "denoise",
+      "scale": 1,
+      "multiple": 16,
+      "license": "MIT",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "file": "nafnet-denoise-32.onnx",
+      "bytes": 59067870,
+      "sha256": "89397f560b286fa4843b7b8bd6bc121c5ee6b1c077e10a7c5d40f0a12fe20d1e",
+      "channels": 3,
+      "max_diff_vs_fp32": 0.0002301335334777832
+    },
+    "nafnet-deblur-32": {
+      "kind": "sharpen",
+      "scale": 1,
+      "multiple": 16,
+      "license": "MIT",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "file": "nafnet-deblur-32.onnx",
+      "bytes": 34988470,
+      "sha256": "9831068405799d5975c8c065a6f16ff42c86bc577d23750db6704ec62e07fc03",
+      "channels": 3,
+      "max_diff_vs_fp32": 0.00033588707447052
+    }
+  }
+}

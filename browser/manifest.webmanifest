@@ -1,0 +1,11 @@
+{
+  "name": "AI Photo Enhancer — S3eidat Tools",
+  "short_name": "AI Enhancer",
+  "description": "Upscale, denoise and sharpen photos with AI, free and private",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0f12",
+  "theme_color": "#0d0f12",
+  "icons": [{ "src": "kit/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
