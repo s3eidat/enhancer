@@ -1,0 +1,202 @@
+{
+  "models": {
+    "realesr-general-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+      "weights_sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+      "license": "BSD-3-Clause",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "files": {
+        "fp32": {
+          "file": "realesr-general-x4.onnx",
+          "bytes": 4866396,
+          "sha256": "0ffa1fb93ebfedda383e31ff9013d40b1abdfa86cb0e8276e6fec190cae39120",
+          "max_diff": 1.8775463104248047e-06
+        }
+      }
+    },
+    "nafnet-denoise-32": {
+      "kind": "denoise",
+      "scale": 1,
+      "multiple": 16,
+      "source": "https://drive.google.com/file/d/1lsByk21Xw-6aW7epCwOQxvm6HYCQZPHZ/view",
+      "weights_sha256": "89c70e808d1783b6c07911306e106aaf0d4f7f3da8c61078b99ff7f8929a26f4",
+      "license": "MIT",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "files": {
+        "fp32": {
+          "file": "nafnet-denoise-32.onnx",
+          "bytes": 117122200,
+          "sha256": "650250d754df173b3939abad3451ccb78964f64bf1dff54df2cfc7d103497e3c",
+          "max_diff": 4.172325134277344e-07
+        }
+      }
+    },
+    "yunet": {
+      "kind": "detect",
+      "scale": 1,
+      "multiple": 1,
+      "license": "MIT",
+      "project": "https://github.com/opencv/opencv_zoo",
+      "credit": "YuNet face detector, OpenCV Zoo",
+      "source": "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+      "files": {
+        "fp32": {
+          "file": "yunet.onnx",
+          "bytes": 232589,
+          "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+        }
+      }
+    },
+    "realesrgan-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      "weights_sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+      "license": "BSD-3-Clause",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "files": {
+        "fp32": {
+          "file": "realesrgan-x4.onnx",
+          "bytes": 67051618,
+          "sha256": "d5581028c02bc2a1a0a47da614206d05c34945fbd103a9bd846a7011304e8024",
+          "max_diff": 3.159046173095703e-06
+        }
+      }
+    },
+    "realesrgan-x2": {
+      "kind": "upscale",
+      "scale": 2,
+      "multiple": 2,
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+      "weights_sha256": "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb",
+      "license": "BSD-3-Clause",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "files": {
+        "fp32": {
+          "file": "realesrgan-x2.onnx",
+          "bytes": 67076120,
+          "sha256": "fc6c6fef5adfb153b990dc50b398cc1ccb5b4c2aa0ce75f6a2866900a19a5dd1",
+          "max_diff": 2.86102294921875e-06
+        }
+      }
+    },
+    "realesrgan-anime-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+      "weights_sha256": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da",
+      "license": "BSD-3-Clause",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "files": {
+        "fp32": {
+          "file": "realesrgan-anime-x4.onnx",
+          "bytes": 17939943,
+          "sha256": "c12d6ba1c594b6c61fe48fc6f11b5b58a5dfcbf654b24369e793c7b4458c6a1a",
+          "max_diff": 3.0994415283203125e-06
+        }
+      }
+    },
+    "realesr-general-wdn-x4": {
+      "kind": "upscale",
+      "scale": 4,
+      "multiple": 1,
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth",
+      "weights_sha256": "1641f8c4464b9f097c9fdda5589273713f67cf59f3d909e0bd688f0cee269dca",
+      "license": "BSD-3-Clause",
+      "project": "https://github.com/xinntao/Real-ESRGAN",
+      "credit": "Real-ESRGAN, Xintao Wang et al.",
+      "files": {
+        "fp32": {
+          "file": "realesr-general-wdn-x4.onnx",
+          "bytes": 4866396,
+          "sha256": "2fc26c41ba75412d0643a36975529a8b4cfbad3124be4f4a2dd4524f821cde79",
+          "max_diff": 3.2186508178710938e-06
+        }
+      }
+    },
+    "nafnet-denoise-64": {
+      "kind": "denoise",
+      "scale": 1,
+      "multiple": 16,
+      "source": "https://drive.google.com/file/d/14Fht1QQJ2gMlk4N1ERCRuElg8JfjrWWR/view",
+      "weights_sha256": "cd685efaae01f7c4e9951f2deab05780079c8eb1e49ed664b72f6db04dabb445",
+      "license": "MIT",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "files": {
+        "fp32": {
+          "file": "nafnet-denoise-64.onnx",
+          "bytes": 464415269,
+          "sha256": "77369d3f565fd002d2c9a7f81f6468ea2ba39d2e25c88e8510cc0ee4562da606",
+          "max_diff": 5.960464477539062e-07
+        }
+      }
+    },
+    "nafnet-deblur-32": {
+      "kind": "sharpen",
+      "scale": 1,
+      "multiple": 16,
+      "source": "https://drive.google.com/file/d/1Fr2QadtDCEXg6iwWX8OzeZLbHOx2t5Bj/view",
+      "weights_sha256": "19394e6155d12ef6371d1d57496f87f0ec88f92bdffa27c0792690722d5d1a5c",
+      "license": "MIT",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "files": {
+        "fp32": {
+          "file": "nafnet-deblur-32.onnx",
+          "bytes": 68929917,
+          "sha256": "9d3f02c2cc8b51cdd6449d22d9ab326e24d5db3c14a5572701c385effbb4fa17",
+          "max_diff": 4.76837158203125e-07
+        }
+      }
+    },
+    "nafnet-deblur-64": {
+      "kind": "sharpen",
+      "scale": 1,
+      "multiple": 16,
+      "source": "https://drive.google.com/file/d/1S0PVRbyTakYY9a82kujgZLbMihfNBLfC/view",
+      "weights_sha256": "329d3ab4077b8d6b7ff61de376e483714667960bf85be027bf4335cda701196f",
+      "license": "MIT",
+      "project": "https://github.com/megvii-research/NAFNet",
+      "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
+      "files": {
+        "fp32": {
+          "file": "nafnet-deblur-64.onnx",
+          "bytes": 272037832,
+          "sha256": "ee131d8be3f8eaa4de02e706ee4b6f6f33a9a573b06194afe4656302bc2c65cd",
+          "max_diff": 2.771615982055664e-06
+        }
+      }
+    },
+    "gfpgan-1.4": {
+      "kind": "face",
+      "scale": 1,
+      "multiple": 512,
+      "fixed": 512,
+      "source": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
+      "weights_sha256": "e2cd4703ab14f4d01fd1383a8a8b266f9a5833dacee8e6a79d3bf21a1b6be5ad",
+      "license": "Apache-2.0",
+      "project": "https://github.com/TencentARC/GFPGAN",
+      "credit": "GFPGAN v1.4, Xintao Wang et al. (Tencent ARC)",
+      "note": "Clean architecture only. Weights trained on FFHQ (CC BY-NC-SA 4.0 dataset).",
+      "files": {
+        "fp32": {
+          "file": "gfpgan-1.4.onnx",
+          "bytes": 340351960,
+          "sha256": "d8616047b4508662b8bd9da61d3e4d2c9edcac18e6a66305beb55d070ca87ba6",
+          "max_diff": 8.493661880493164e-06
+        }
+      }
+    }
+  }
+}

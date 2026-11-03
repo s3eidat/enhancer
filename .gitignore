@@ -1,0 +1,9 @@
+.venv/
+.cache/
+__pycache__/
+.pytest_cache/
+models/*.onnx
+build/
+dist/
+out/
+*.log

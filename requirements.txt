@@ -1,0 +1,8 @@
+# runtime
+numpy>=1.26
+pillow>=10.0
+opencv-python-headless>=4.9
+onnxruntime-directml>=1.20
+pywebview>=5.0
+# dev / tests
+pytest>=8.0
