@@ -1,4 +1,4 @@
-"""Command line: python -m enhancer.cli photo.jpg [more...] -o OUTDIR --upscale 4 --denoise 0.7 --faces 0.8"""
+"""Command line: python -m enhancer.cli photo.jpg clip.mp4 [more...] -o OUTDIR --upscale 4 --denoise 0.7 --fps 2x"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import imageio
+from . import imageio, video
 from .autopilot import suggest
 from .pipeline import Settings, process
 from .runtime import Runtime
@@ -25,6 +25,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--faces", type=float, default=0.0)
     ap.add_argument("--quality", default="best", choices=["best", "fast"])
     ap.add_argument("--format", default="png", choices=list(imageio.FORMATS))
+    ap.add_argument("--fps", default="off", choices=["off", "2x", "4x", "30", "60", "120"], help="video frame rate")
+    ap.add_argument("--slowmo", type=int, default=1, choices=[1, 2, 4, 8], help="video slow motion")
+    ap.add_argument("--vcodec", default="h264", choices=["h264", "h265", "prores"])
     ap.add_argument("--auto", action="store_true", help="let Autopilot pick the settings")
     ap.add_argument("--cpu", action="store_true")
     a = ap.parse_args(argv)
@@ -35,11 +38,13 @@ def main(argv: list[str] | None = None) -> int:
     for src in map(Path, a.inputs):
         t0 = time.time()
         try:
-            loaded = imageio.load(src)
+            is_vid = video.is_video(src)
+            loaded = imageio.Loaded(rgb=video.read_frame(src, video.probe(src).duration / 3)) if is_vid                 else imageio.load(src)
             s = Settings.from_dict({k: getattr(a, k) for k in
-                                    ("upscale", "model", "detail", "denoise", "sharpen", "faces", "quality", "format")})
+                                    ("upscale", "model", "detail", "denoise", "sharpen", "faces", "quality", "format",
+                                     "fps", "slowmo", "vcodec")})
             if a.auto:
-                tip = suggest(loaded.rgb, rt)
+                tip = suggest(loaded.rgb, rt, is_video=is_vid)
                 s = Settings.from_dict({**s.to_dict(), **tip["settings"]})
                 print("  autopilot:", "; ".join(tip["reasons"]))
             report: dict = {}
@@ -51,6 +56,13 @@ def main(argv: list[str] | None = None) -> int:
                     last[0] = pct
                     print(f"\r  {src.name}: {stage} {pct}%   ", end="", flush=True)
 
+            if is_vid:
+                dst = imageio.output_path(src, Path(a.out), s.format, s.suffix, ext=video.CONTAINER[s.vcodec])
+                video.enhance_video(src, dst, s, rt, show, report=report)
+                w, h = report["size"]
+                print(f"\r  {src.name} -> {dst} ({w}x{h}, {report['frames_in']} -> {report['frames_out']} frames, "
+                      f"{report['fps_out']:.3f} fps, {report['encoder']}, {time.time() - t0:.1f}s)")
+                continue
             out = process(loaded.rgb, s, rt, show, report=report)
             alpha = loaded.alpha
             if alpha is not None and s.upscale > 1:

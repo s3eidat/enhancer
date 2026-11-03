@@ -197,6 +197,46 @@
           "max_diff": 8.493661880493164e-06
         }
       }
+    },
+    "rife-4.25": {
+      "kind": "interp",
+      "scale": 1,
+      "multiple": 128,
+      "channels": 7,
+      "source": "https://drive.google.com/file/d/1ZKjcbmt1hypiFprJPIKW0Tt0lr_2i7bg/view",
+      "weights_sha256": "6615790efd627772917205db291f51cd392528a157ecbb2ecaeec3bff8eb6de2",
+      "license": "MIT",
+      "project": "https://github.com/hzwer/Practical-RIFE",
+      "credit": "RIFE v4.25 frame interpolation, Zhewei Huang et al.",
+      "note": "Weights from the official Practical-RIFE 4.25 release (MIT, per its README).",
+      "files": {
+        "fp32": {
+          "file": "rife-4.25.onnx",
+          "bytes": 22848911,
+          "sha256": "93d5a6246b50b38a4298a86f71a47b915ed9527294d942042b3ffde9391240b7",
+          "max_diff": 5.543231964111328e-06
+        }
+      }
+    },
+    "rife-4.25-uhd": {
+      "kind": "interp",
+      "scale": 1,
+      "multiple": 256,
+      "channels": 7,
+      "source": "https://drive.google.com/file/d/1ZKjcbmt1hypiFprJPIKW0Tt0lr_2i7bg/view",
+      "weights_sha256": "6615790efd627772917205db291f51cd392528a157ecbb2ecaeec3bff8eb6de2",
+      "license": "MIT",
+      "project": "https://github.com/hzwer/Practical-RIFE",
+      "credit": "RIFE v4.25 frame interpolation, Zhewei Huang et al.",
+      "note": "Weights from the official Practical-RIFE 4.25 release (MIT, per its README).",
+      "files": {
+        "fp32": {
+          "file": "rife-4.25-uhd.onnx",
+          "bytes": 22849120,
+          "sha256": "5153d6c166a5340b07bdbecb0edc04c1076ecbce8a3d7467360c450b115e2c52",
+          "max_diff": 7.933378219604492e-05
+        }
+      }
     }
   }
 }

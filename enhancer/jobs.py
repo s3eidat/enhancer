@@ -12,7 +12,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import imageio, paths
+from . import imageio, paths, video
 from .ops import resize
 from .pipeline import Settings, process
 from .runtime import Runtime
@@ -41,10 +41,17 @@ class Job:
     before: Path | None = None  # browser-viewable files for the compare view
     after: Path | None = None
     notice: str = ""
+    eta: float | None = None  # seconds left, once there is enough progress to guess
+    video: dict = field(default_factory=dict)  # frames and frame rates, for videos
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
 
+    @property
+    def kind(self) -> str:
+        return "video" if video.is_video(self.src) else "image"
+
     def to_dict(self) -> dict:
-        return {"id": self.id, "name": self.src.name, "src": str(self.src), "status": self.status,
+        return {"id": self.id, "name": self.src.name, "src": str(self.src), "status": self.status, "kind": self.kind,
+                "eta": None if self.eta is None else round(self.eta), "video": self.video,
                 "progress": round(self.progress, 4), "stage": self.stage, "out": str(self.out) if self.out else "",
                 "error": self.error, "in_size": self.in_size, "out_size": self.out_size,
                 "seconds": round(self.seconds, 1), "faces": self.faces, "settings": self.settings.to_dict(),
@@ -77,7 +84,7 @@ class JobQueue:
         with self._wake:
             for s in srcs:
                 p = Path(s)
-                if p.suffix.lower() not in imageio.INPUT_EXTS or not p.is_file():
+                if not (p.suffix.lower() in imageio.INPUT_EXTS or video.is_video(p)) or not p.is_file():
                     continue
                 job = Job(src=p, settings=settings, out_dir=Path(out_dir))
                 self.jobs[job.id] = job
@@ -110,7 +117,7 @@ class JobQueue:
         with self._wake:
             if settings:
                 job.settings = settings
-            job.status, job.progress, job.stage, job.error = "queued", 0.0, "", ""
+            job.status, job.progress, job.stage, job.error, job.eta = "queued", 0.0, "", "", None
             job._cancel = threading.Event()
             self._wake.notify_all()
         self.on_change(job)
@@ -176,26 +183,18 @@ class JobQueue:
         def progress(frac: float, stage: str) -> None:
             job.progress, job.stage = frac, stage
             now = time.time()
+            if frac > 0.02:
+                job.eta = (now - t0) * (1 - frac) / frac
             if now - last[0] > 0.1 or frac >= 1:
                 last[0] = now
                 self.on_change(job)
 
         self.on_change(job)
         try:
-            loaded = imageio.load(job.src)
-            h, w = loaded.rgb.shape[:2]
-            job.in_size = (w, h)
-            report: dict = {}
-            out = process(loaded.rgb, job.settings, self.rt, progress, job._cancel.is_set, report)
-            oh, ow = out.shape[:2]
-            alpha = upscale_alpha(loaded.alpha, ow, oh)
-            fmt = job.settings.format if job.settings.format in imageio.FORMATS else "png"
-            dst = imageio.output_path(job.src, job.out_dir, fmt, job.settings.suffix)
-            imageio.save(out, dst, fmt, alpha=alpha, exif=loaded.exif, icc=loaded.icc)
-            job.out, job.out_size, job.faces = dst, (ow, oh), report.get("faces")
-            job.before = job.src if job.src.suffix.lower() in BROWSER_EXTS and loaded.bits == 8 else \
-                imageio.preview_jpeg(loaded.rgb, self.preview_dir / f"{job.id}_before.jpg")
-            job.after = imageio.preview_jpeg(out, self.preview_dir / f"{job.id}_after.jpg", AFTER_PREVIEW_MAX)
+            if job.kind == "video":
+                self._video(job, progress)
+            else:
+                self._image(job, progress)
             job.status, job.progress, job.stage = "done", 1.0, "Done"
         except Cancelled:
             job.status, job.stage = "cancelled", "Cancelled"
@@ -204,6 +203,34 @@ class JobQueue:
         except Exception as e:
             log.exception("job %s failed", job.src)
             job.status, job.error = "error", str(e) or e.__class__.__name__
-        job.seconds = time.time() - t0
+        job.seconds, job.eta = time.time() - t0, None
         job.notice = self.rt.notice
         self.on_change(job)
+
+    def _image(self, job: Job, progress) -> None:
+        loaded = imageio.load(job.src)
+        h, w = loaded.rgb.shape[:2]
+        job.in_size = (w, h)
+        report: dict = {}
+        out = process(loaded.rgb, job.settings, self.rt, progress, job._cancel.is_set, report)
+        oh, ow = out.shape[:2]
+        alpha = upscale_alpha(loaded.alpha, ow, oh)
+        fmt = job.settings.format if job.settings.format in imageio.FORMATS else "png"
+        dst = imageio.output_path(job.src, job.out_dir, fmt, job.settings.suffix)
+        imageio.save(out, dst, fmt, alpha=alpha, exif=loaded.exif, icc=loaded.icc)
+        job.out, job.out_size, job.faces = dst, (ow, oh), report.get("faces")
+        job.before = job.src if job.src.suffix.lower() in BROWSER_EXTS and loaded.bits == 8 else \
+            imageio.preview_jpeg(loaded.rgb, self.preview_dir / f"{job.id}_before.jpg")
+        job.after = imageio.preview_jpeg(out, self.preview_dir / f"{job.id}_after.jpg", AFTER_PREVIEW_MAX)
+
+    def _video(self, job: Job, progress) -> None:
+        s = job.settings
+        dst = imageio.output_path(job.src, job.out_dir, "png", s.suffix, ext=video.CONTAINER[s.vcodec])
+        report: dict = {}
+        video.enhance_video(job.src, dst, s, self.rt, progress, job._cancel.is_set, report)
+        before, after = report.pop("before"), report.pop("after")
+        job.out, job.out_size = dst, report["size"]
+        job.in_size = (before.shape[1], before.shape[0])
+        job.video = {k: report[k] for k in ("frames_in", "frames_out", "fps_in", "fps_out", "encoder", "cuts", "audio")}
+        job.before = imageio.preview_jpeg(before, self.preview_dir / f"{job.id}_before.jpg")
+        job.after = imageio.preview_jpeg(after, self.preview_dir / f"{job.id}_after.jpg", AFTER_PREVIEW_MAX)

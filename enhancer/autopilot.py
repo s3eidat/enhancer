@@ -42,19 +42,30 @@ def blur_score(rgb: np.ndarray) -> float:
     return float(cv2.Laplacian(gray, cv2.CV_32F).var())
 
 
-def suggest(rgb: np.ndarray, rt: Runtime | None = None) -> dict:
+def suggest(rgb: np.ndarray, rt: Runtime | None = None, is_video: bool = False) -> dict:
+    """For a video, rgb is one frame. Videos get the fast upscaler and smaller sizes: every frame costs time."""
     h, w = rgb.shape[:2]
     long_side = max(h, w)
     s: dict = {}
     reasons: list[str] = []
 
-    if long_side < 1200:
+    if is_video:
+        if long_side < 720:
+            s["upscale"], why = 4, "low resolution"
+        elif long_side < 1600:
+            s["upscale"], why = 2, "HD or less"
+        else:
+            s["upscale"], why = 1, "already Full HD or more"
+        s["model"] = "fast"
+        reasons.append(f"Upscale {s['upscale']}x: {why} ({w}x{h}), Fast model for video")
+    elif long_side < 1200:
         s["upscale"], why = 4, f"small image ({w}x{h})"
     elif long_side < 3000:
         s["upscale"], why = 2, f"medium image ({w}x{h})"
     else:
         s["upscale"], why = 1, f"already large ({w}x{h})"
-    reasons.append(f"Upscale {s['upscale']}x: {why}")
+    if not is_video:
+        reasons.append(f"Upscale {s['upscale']}x: {why}")
 
     sigma = noise_sigma(rgb)
     s["denoise"] = 0.0 if sigma < 1.5 else 0.5 if sigma < 4 else 0.75 if sigma < 8 else 1.0
@@ -73,6 +84,8 @@ def suggest(rgb: np.ndarray, rt: Runtime | None = None) -> dict:
             # GFPGAN works at ~126px between the eyes. Faces smaller than that in the source gain real
             # detail; big, clean faces only lose some of theirs.
             s["faces"] = 0.8 if biggest < 130 or sigma >= 6 else 0.5 if biggest < 200 else 0.0
+            if is_video:  # restored faces can shimmer from frame to frame, so stay gentle
+                s["faces"] = min(s["faces"], 0.5)
             reasons.append(f"Faces {int(s['faces'] * 100)}%: {len(faces)} found, "
                            + ("small or noisy" if s["faces"] >= 0.8 else "medium" if s["faces"] else "already detailed"))
         else:

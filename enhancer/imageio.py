@@ -81,8 +81,8 @@ def to_uint8(rgb: np.ndarray) -> np.ndarray:
     return (np.clip(rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
 
 
-def output_path(src: Path, out_dir: Path, fmt: str, suffix: str = "_enhanced") -> Path:
-    ext = FORMATS[fmt][0]
+def output_path(src: Path, out_dir: Path, fmt: str, suffix: str = "_enhanced", ext: str | None = None) -> Path:
+    ext = ext or FORMATS[fmt][0]
     out_dir.mkdir(parents=True, exist_ok=True)
     p = out_dir / f"{src.stem}{suffix}{ext}"
     n = 2

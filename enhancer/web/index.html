@@ -23,7 +23,7 @@
 <main class="grid">
   <aside class="queue">
     <div class="pane-head">
-      <h2>Photos <span class="count" id="count"></span></h2>
+      <h2>Files <span class="count" id="count"></span></h2>
       <div class="row">
         <button class="ghost small" id="clearBtn" title="Remove finished items">Clear done</button>
         <button class="small" id="addBtn">+ Add</button>
@@ -31,15 +31,17 @@
     </div>
     <ul class="list" id="list"></ul>
     <div class="empty-list" id="emptyList">
-      <p>Drop photos or a folder anywhere</p>
-      <p class="muted">JPG, PNG, WebP, TIFF, BMP · nothing leaves your PC</p>
+      <p>Drop photos, videos or a folder anywhere</p>
+      <p class="muted">JPG, PNG, WebP, TIFF · MP4, MOV, MKV, WebM · nothing leaves your PC</p>
     </div>
   </aside>
 
   <section class="stage">
     <div class="stage-bar">
-      <div class="stage-title" id="stageTitle">No photo selected</div>
+      <div class="stage-title" id="stageTitle">Nothing selected</div>
       <div class="row">
+        <button class="ghost small" id="playBtn" hidden>Play video</button>
+        <button class="ghost small" id="revealBtn" hidden>Show file</button>
         <span class="muted small-text" id="stageInfo"></span>
         <div class="seg small" id="zoomSeg">
           <button data-zoom="fit">Fit</button><button data-zoom="1">100%</button><button data-zoom="2">200%</button>
@@ -54,16 +56,21 @@
       <span class="tag right" id="tagAfter" hidden>After</span>
       <div class="hint" id="viewerHint">
         <div class="drop-art" aria-hidden="true"><span></span><span></span></div>
-        <h3>Drop photos to enhance</h3>
-        <p>Upscale 2×/4×, remove noise, sharpen and recover faces, on your own GPU, for free.</p>
-        <button id="addBtn2">Choose photos</button>
+        <h3>Drop photos or videos to enhance</h3>
+        <p>Upscale 2×/4×, remove noise, sharpen, recover faces and smooth video to 60 fps, on your own GPU, for free.</p>
+        <button id="addBtn2">Choose files</button>
       </div>
       <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyText">Working…</span></div>
       <div class="live-bar" id="liveBar" hidden>
         <span id="liveText">Preview</span>
         <button class="ghost small" id="liveBack">Back to full photo</button>
       </div>
-      <div class="click-tip" id="clickTip" hidden>Click anywhere on the photo for a quick preview of that spot</div>
+      <div class="click-tip" id="clickTip" hidden>Click anywhere on the picture for a quick preview of that spot</div>
+      <div class="scrub" id="scrub" hidden>
+        <span class="muted">Frame</span>
+        <input type="range" id="scrubRange" min="0" max="1000" step="1">
+        <span id="scrubTime">0:00</span>
+      </div>
     </div>
   </section>
 
@@ -109,9 +116,28 @@
         </div>
       </section>
 
+      <section class="group" id="videoGroup" hidden>
+        <div class="label">Video</div>
+        <div class="row between">
+          <span class="label inline">Frame rate</span>
+          <div class="seg small" id="fpsSeg"><button data-v="off">Same</button><button data-v="2x">2×</button><button data-v="4x">4×</button><button data-v="60">60</button><button data-v="120">120</button></div>
+        </div>
+        <div class="row between">
+          <span class="label inline">Slow motion</span>
+          <div class="seg small" id="slowSeg"><button data-v="1">Off</button><button data-v="2">2×</button><button data-v="4">4×</button><button data-v="8">8×</button></div>
+        </div>
+        <div class="row between">
+          <span class="label inline">Save video as</span>
+          <select id="vcodec" class="short">
+            <option value="h264">MP4 · H.264</option><option value="h265">MP4 · H.265</option><option value="prores">MOV · ProRes</option>
+          </select>
+        </div>
+        <div class="muted small-text" id="videoText"></div>
+      </section>
+
       <section class="group">
-        <div class="label">Save as</div>
-        <div class="row">
+        <div class="label" id="saveLabel">Save as</div>
+        <div class="row" id="formatRow">
           <select id="format">
             <option value="png">PNG</option><option value="jpg">JPG (95%)</option><option value="webp">WebP</option>
             <option value="tiff">TIFF</option><option value="png16">PNG 16-bit</option><option value="tiff16">TIFF 16-bit</option>

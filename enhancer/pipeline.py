@@ -25,6 +25,10 @@ class Settings:
     quality: str = "best"     # best | fast (NAFNet width 64 or 32)
     format: str = "png"
     suffix: str = "_enhanced"
+    # video only
+    fps: str = "off"          # off | 2x | 4x | 30 | 60 | 120 (a target rate; only ever raises it)
+    slowmo: int = 1           # 1, 2, 4 or 8: play this many times slower at the source frame rate (no audio)
+    vcodec: str = "h264"      # h264 | h265 | prores
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "Settings":
@@ -34,6 +38,9 @@ class Settings:
         s.upscale = int(s.upscale) if int(s.upscale) in (1, 2, 4) else 2
         s.model = s.model if s.model in ops.UPSCALE_MODELS else "standard"
         s.quality = s.quality if s.quality in ("best", "fast") else "best"
+        s.fps = str(s.fps) if str(s.fps) in ("off", "2x", "4x", "30", "60", "120") else "off"
+        s.slowmo = int(s.slowmo) if int(s.slowmo) in (1, 2, 4, 8) else 1
+        s.vcodec = s.vcodec if s.vcodec in ("h264", "h265", "prores") else "h264"
         for k in ("detail", "denoise", "sharpen", "faces"):
             setattr(s, k, float(min(1.0, max(0.0, float(getattr(s, k))))))
         return s

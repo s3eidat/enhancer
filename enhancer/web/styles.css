@@ -137,6 +137,14 @@ select {
   background: rgba(10,11,14,.85); border: 1px solid var(--line); padding: 5px 6px 5px 14px; border-radius: 99px; font-size: 13px;
   white-space: nowrap;
 }
+.scrub {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(560px, 80%); display: flex; gap: 10px;
+  align-items: center; background: rgba(10,11,14,.85); border: 1px solid var(--line); padding: 6px 14px; border-radius: 99px;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.scrub input { flex: 1; }
+.scrub ~ .click-tip, .click-tip.raised { bottom: 62px; }
+select.short { width: auto; }
 .click-tip { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(10,11,14,.8); padding: 6px 12px; border-radius: 99px; font-size: 12px; color: var(--muted); pointer-events: none; }
 
 /* settings panel */
@@ -181,3 +189,4 @@ dialog li .note { color: var(--warn); font-size: 12px; }
 dialog form { text-align: right; }
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 3px solid var(--panel); }
+.seg.disabled { opacity: .4; pointer-events: none; }

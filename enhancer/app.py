@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import APP_NAME, __version__, imageio, paths
+from . import APP_NAME, __version__, imageio, paths, video
 from .autopilot import suggest
 from .jobs import JobQueue
 from .ops import resize
@@ -41,6 +41,10 @@ def setup_logging(verbose: bool = False) -> None:
         root.addHandler(sh)
     logging.getLogger("pywebview").setLevel(logging.WARNING)
     sys.excepthook = lambda t, e, tb: log.critical("Unhandled exception", exc_info=(t, e, tb))
+
+
+def supported(p: Path) -> bool:
+    return p.suffix.lower() in imageio.INPUT_EXTS or video.is_video(p)
 
 
 class Prefs:
@@ -74,15 +78,20 @@ class Api:
                 "out_dir": a.prefs.data.get("out_dir") or str(paths.default_output_dir()),
                 "formats": list(imageio.FORMATS), "credits": rt.catalog.credits(),
                 "faces_available": rt.catalog.available("gfpgan-1.4") and rt.catalog.available("yunet"),
-                "exts": sorted(imageio.INPUT_EXTS)}
+                "exts": sorted(imageio.INPUT_EXTS), "video_exts": sorted(video.VIDEO_EXTS),
+                "ffmpeg": video.ffmpeg_path() is not None,
+                "interp_available": rt.catalog.available("rife-4.25") and rt.catalog.available("rife-4.25-uhd")}
 
     def pick_files(self) -> list[str]:
         if self._app.window is None:
             return []
         import webview
-        exts = ";".join(f"*{e}" for e in sorted(imageio.INPUT_EXTS))
-        res = self._app.window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
-                                                  file_types=(f"Images ({exts})", "All files (*.*)"))
+        imgs = ";".join(f"*{e}" for e in sorted(imageio.INPUT_EXTS))
+        vids = ";".join(f"*{e}" for e in sorted(video.VIDEO_EXTS))
+        res = self._app.window.create_file_dialog(
+            webview.FileDialog.OPEN, allow_multiple=True,
+            file_types=(f"Photos and videos ({imgs};{vids})", f"Photos ({imgs})", f"Videos ({vids})",
+                        "All files (*.*)"))
         return list(res or [])
 
     def pick_folder(self) -> str:
@@ -105,13 +114,14 @@ class Api:
         out = []
         for f in files:
             p = Path(f)
-            if p.suffix.lower() not in imageio.INPUT_EXTS or not p.is_file():
+            if not supported(p) or not p.is_file():
                 continue
+            kind = "video" if video.is_video(p) else "image"
             try:
-                out.append({"path": str(p), "name": p.name, **self._app.thumb(p)})
+                out.append({"path": str(p), "name": p.name, "kind": kind, **self._app.thumb(p)})
             except Exception as e:
                 log.warning("cannot read %s: %s", p, e)
-                out.append({"path": str(p), "name": p.name, "error": f"Cannot read this image: {e}"})
+                out.append({"path": str(p), "name": p.name, "kind": kind, "error": f"Cannot read this {kind}: {e}"})
         return out
 
     def jobs(self) -> list[dict]:
@@ -137,8 +147,12 @@ class Api:
         return {"before": srv.file_url(job.before), "after": srv.file_url(job.after),
                 "in_size": job.in_size, "out_size": job.out_size}
 
-    def original(self, path: str) -> dict:
-        return self._app.original(Path(path))
+    def original(self, path: str, at: float | None = None) -> dict:
+        """at: for videos, the time in seconds of the frame to show (and to preview and run Autopilot on)."""
+        p = Path(path)
+        if at is not None and video.is_video(p):
+            self._app.frame_time[p] = float(at)
+        return self._app.original(p)
 
     def preview(self, path: str, settings: dict, cx: float, cy: float) -> dict:
         try:
@@ -149,7 +163,7 @@ class Api:
 
     def autopilot(self, path: str) -> dict:
         try:
-            tip = suggest(self._app.load_cached(Path(path)).rgb, self._app.rt)
+            tip = suggest(self._app.load_cached(Path(path)).rgb, self._app.rt, is_video=video.is_video(path))
             return {"settings": tip["settings"], "reasons": tip["reasons"]}
         except Exception as e:
             log.exception("autopilot failed")
@@ -159,6 +173,11 @@ class Api:
         p = Path(path)
         if p.exists():
             subprocess.Popen(["explorer", "/select,", str(p)])
+
+    def open_file(self, path: str) -> None:
+        p = Path(path)
+        if p.is_file():
+            os.startfile(str(p))  # noqa: S606 (plays a result the app wrote)
 
     def open_folder(self, path: str) -> None:
         p = Path(path)
@@ -177,21 +196,41 @@ class EnhancerApp:
         self.queue = JobQueue(self.rt, preview_dir=self.preview_dir)
         self.server = LocalServer(port=port)
         self.window = None
-        self._cache: tuple[Path, float, imageio.Loaded] | None = None
+        self._cache: tuple[tuple, imageio.Loaded] | None = None
         self._cache_lock = threading.Lock()
+        self.frame_time: dict[Path, float] = {}  # video -> time of the frame shown and previewed
+        self._vinfo: dict[Path, video.VideoInfo] = {}
+
+    def video_info(self, p: Path) -> video.VideoInfo:
+        if p not in self._vinfo:
+            self._vinfo[p] = video.probe(p)
+        return self._vinfo[p]
 
     def load_cached(self, p: Path) -> imageio.Loaded:
-        """The last opened image stays in memory so preview clicks and Autopilot are instant."""
+        """The last opened image (or video frame) stays in memory so preview clicks and Autopilot are instant."""
         with self._cache_lock:
-            mtime = p.stat().st_mtime
-            if self._cache and self._cache[0] == p and self._cache[1] == mtime:
-                return self._cache[2]
-            loaded = imageio.load(p)
-            self._cache = (p, mtime, loaded)
+            is_vid = video.is_video(p)
+            if is_vid and p not in self.frame_time:
+                self.frame_time[p] = self.video_info(p).duration / 3
+            key = (p, p.stat().st_mtime, self.frame_time.get(p) if is_vid else None)
+            if self._cache and self._cache[0] == key:
+                return self._cache[1]
+            if is_vid:
+                loaded = imageio.Loaded(rgb=video.read_frame(p, key[2], self.video_info(p)))
+            else:
+                loaded = imageio.load(p)
+            self._cache = (key, loaded)
             return loaded
 
     def thumb(self, p: Path) -> dict:
         from PIL import Image, ImageOps
+        if video.is_video(p):
+            info = self.video_info(p)
+            frame = self.load_cached(p).rgb
+            dst = imageio.preview_jpeg(frame, self.preview_dir / f"thumb_{abs(hash(str(p)))}.jpg", THUMB)
+            return {"thumb": self.server.file_url(dst), "size": (info.width, info.height),
+                    "video": {"duration": round(info.duration, 2), "fps": round(float(info.fps), 3),
+                              "frames": info.frames, "audio": info.audio, "at": self.frame_time[p]}}
         with Image.open(p) as im:
             im = ImageOps.exif_transpose(im)
             size = im.size
@@ -203,11 +242,13 @@ class EnhancerApp:
     def original(self, p: Path) -> dict:
         loaded = self.load_cached(p)
         h, w = loaded.rgb.shape[:2]
-        if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif"} and loaded.bits == 8:
+        if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif"} and loaded.bits == 8 \
+                and not video.is_video(p):
             src = p
         else:
-            src = imageio.preview_jpeg(loaded.rgb, self.preview_dir / f"orig_{abs(hash(str(p)))}.jpg")
-        return {"url": self.server.file_url(src), "size": [w, h]}
+            stamp = f"{abs(hash(str(p)))}_{int(self.frame_time.get(p, 0) * 1000)}"
+            src = imageio.preview_jpeg(loaded.rgb, self.preview_dir / f"orig_{stamp}.jpg")
+        return {"url": self.server.file_url(src), "size": [w, h], "at": self.frame_time.get(p)}
 
     def live_preview(self, p: Path, s: Settings, cx: float, cy: float) -> dict:
         loaded = self.load_cached(p)
@@ -236,7 +277,7 @@ class EnhancerApp:
         for f in files:
             p = Path(f)
             if p.is_dir():
-                expanded += [str(x) for x in sorted(p.iterdir()) if x.suffix.lower() in imageio.INPUT_EXTS]
+                expanded += [str(x) for x in sorted(p.iterdir()) if supported(x)]
             else:
                 expanded.append(str(p))
         if expanded and self.window:

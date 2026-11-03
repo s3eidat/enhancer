@@ -32,16 +32,41 @@ const pct = (v) => `${Math.round(v * 100)}%`;
 const fmtSize = (s) => (s ? `${s[0]}×${s[1]}` : "");
 const selItem = () => state.items.find((i) => i.key === state.sel);
 function mp(s) { return s ? ((s[0] * s[1]) / 1e6).toFixed(1) + " MP" : ""; }
+const isVideo = (it) => it && it.kind === "video";
+const hasVideos = () => state.items.some(isVideo);
+const hasImages = () => state.items.some((i) => !isVideo(i));
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+/* same rule as video.plan_rate: returns [output fps, output frames] */
+function planRate(v, s) {
+  if (!v) return [0, 0];
+  let fps = v.fps, step = 1;
+  if (s.slowmo > 1) step = 1 / s.slowmo;
+  else if (s.fps === "2x" || s.fps === "4x") { fps = v.fps * Number(s.fps[0]); step = v.fps / fps; }
+  else if (/^\d+$/.test(s.fps) && Number(s.fps) > v.fps) { fps = Number(s.fps); step = v.fps / fps; }
+  return [fps, Math.ceil(v.frames / step)];
+}
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 /* ---------- settings panel ---------- */
 const SLIDERS = ["detail", "denoise", "sharpen", "faces"];
+const SEGS = [["upscaleSeg", "upscale", true], ["modelSeg", "model"], ["qualitySeg", "quality"], ["fpsSeg", "fps"],
+  ["slowSeg", "slowmo", true]];
 
 function renderSettings() {
   const s = state.settings;
-  for (const [segId, key] of [["upscaleSeg", "upscale"], ["modelSeg", "model"], ["qualitySeg", "quality"]]) {
+  for (const [segId, key] of SEGS) {
     for (const b of $(segId).children) b.classList.toggle("on", String(s[key]) === b.dataset.v);
   }
+  $("vcodec").value = s.vcodec;
+  $("videoGroup").hidden = !hasVideos();
+  $("formatRow").hidden = !hasImages() && hasVideos();
+  $("saveLabel").textContent = hasImages() ? (hasVideos() ? "Save photos as" : "Save as") : "Save to";
+  $("fpsSeg").classList.toggle("disabled", s.slowmo > 1 || !state.info.interp_available);
+  updateVideoText();
   $("modelGroup").style.opacity = s.upscale > 1 ? 1 : 0.4;
   $("modelText").textContent = MODEL_TEXT[s.model];
   for (const k of SLIDERS) {
@@ -67,17 +92,44 @@ function updateSizeText() {
   $("sizeText").textContent = `${fmtSize(it.size)} → ${fmtSize(out)} (${mp(out)})`;
 }
 
+function updateVideoText() {
+  const it = selItem(), s = state.settings;
+  const t = $("videoText");
+  if (!state.info.ffmpeg) { t.textContent = "ffmpeg was not found, so videos cannot be processed."; return; }
+  if (!state.info.interp_available) { t.textContent = "Frame rate and slow motion need the RIFE model."; return; }
+  if (!isVideo(it) || !it.video) { t.textContent = "Select a video to see its frame count."; return; }
+  const [fps, frames] = planRate(it.video, s);
+  const fpsText = `${+it.video.fps.toFixed(2)} → ${+fps.toFixed(2)} fps`;
+  t.textContent = s.slowmo > 1
+    ? `${fpsText}, ${s.slowmo}× longer (${fmtTime(it.video.duration * s.slowmo)}), no sound · ${frames} frames`
+    : `${fpsText} · ${it.video.frames} → ${frames} frames${it.video.audio ? " · sound kept" : ""}`;
+}
+
+function nothingToDo() {
+  const s = state.settings;
+  const steps = s.upscale > 1 || s.denoise > 0 || s.sharpen > 0 || s.faces > 0;
+  const retime = hasVideos() && (s.fps !== "off" || s.slowmo > 1);
+  return !steps && !retime;
+}
+
 function updateButtons() {
   const ready = state.items.filter((i) => !i.jobId || ["done", "error", "cancelled"].includes(i.job?.status));
-  const nothing = state.settings.upscale === 1 && !state.settings.denoise && !state.settings.sharpen && !state.settings.faces;
+  const nothing = nothingToDo();
   const go = $("goBtn");
   const todo = state.items.filter((i) => !i.jobId && !i.error).length;
   const redo = selItem() && ["done", "error", "cancelled"].includes(selItem().job?.status);
   go.disabled = nothing || (!todo && !redo);
-  go.textContent = nothing ? "Pick at least one step" : todo ? `Enhance ${todo} photo${todo > 1 ? "s" : ""}` : redo ? "Run again with these settings" : "Enhance";
+  const todoItems = state.items.filter((i) => !i.jobId && !i.error);
+  const nv = todoItems.filter(isVideo).length, np = todo - nv;
+  const what = nv && np ? `${todo} files` : nv ? `${nv} video${nv > 1 ? "s" : ""}` : `${np} photo${np > 1 ? "s" : ""}`;
+  go.textContent = nothing ? "Pick at least one step" : todo ? `Enhance ${what}` : redo ? "Run again with these settings" : "Enhance";
   const it = selItem();
   $("autoBtn").disabled = !it || !!it.error;
-  $("previewBtn").disabled = !it || !!it.error || nothing || state.previewBusy;
+  const stepsOnly = state.settings.upscale > 1 || state.settings.denoise || state.settings.sharpen || state.settings.faces;
+  $("previewBtn").disabled = !it || !!it.error || !stepsOnly || state.previewBusy;
+  const done = it && it.job && it.job.status === "done";
+  $("playBtn").hidden = !(done && isVideo(it));
+  $("revealBtn").hidden = !done;
   $("clearBtn").disabled = !state.items.some((i) => ["done", "error", "cancelled"].includes(i.job?.status));
   $("count").textContent = state.items.length ? state.items.length : "";
   void ready;
@@ -92,14 +144,25 @@ function changed(livePreview = true) {
 }
 
 function bindSettings() {
-  for (const [segId, key, num] of [["upscaleSeg", "upscale", true], ["modelSeg", "model"], ["qualitySeg", "quality"]]) {
+  for (const [segId, key, num] of SEGS) {
     $(segId).addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
+      if ((key === "fps" || key === "slowmo") && !state.info.interp_available) return;
+      if (key === "fps" && state.settings.slowmo > 1) return;
       state.settings[key] = num ? Number(b.dataset.v) : b.dataset.v;
       $("reasons").hidden = true;
-      changed();
+      changed(key !== "fps" && key !== "slowmo");
     });
   }
+  $("vcodec").addEventListener("change", (e) => { state.settings.vcodec = e.target.value; changed(false); });
+  $("playBtn").addEventListener("click", () => { const it = selItem(); if (it?.job?.out) call("open_file", it.job.out); });
+  $("revealBtn").addEventListener("click", () => { const it = selItem(); if (it?.job?.out) call("reveal", it.job.out); });
+  $("scrubRange").addEventListener("input", (e) => {
+    const it = selItem(); if (!isVideo(it)) return;
+    $("scrubTime").textContent = fmtTime((Number(e.target.value) / 1000) * it.video.duration);
+    clearTimeout(scrubTimer);
+    scrubTimer = setTimeout(() => seekFrame(it, (Number(e.target.value) / 1000) * it.video.duration), 200);
+  });
   for (const k of SLIDERS) {
     $(k).addEventListener("input", (e) => { state.settings[k] = Number(e.target.value) / 100; $("reasons").hidden = true; changed(); });
   }
@@ -111,9 +174,16 @@ function bindSettings() {
   $("goBtn").addEventListener("click", enhance);
 }
 
+let scrubTimer = 0;
+async function seekFrame(it, at) {
+  it.video.at = at;
+  previewSeq++;
+  await showOriginal(it, at);
+}
+
 async function runAutopilot() {
   const it = selItem(); if (!it) return;
-  setBusy("Autopilot is looking at the photo…");
+  setBusy(`Autopilot is looking at the ${isVideo(it) ? "video" : "photo"}…`);
   const res = await call("autopilot", it.path);
   setBusy(null);
   if (res.error) { toast(res.error); return; }
@@ -131,24 +201,29 @@ async function addFiles(paths) {
   const known = new Set(state.items.map((i) => i.path));
   const fresh = paths.filter((p) => !known.has(p));
   if (!fresh.length) return;
-  setBusy("Reading photos…");
+  setBusy("Reading files…");
   const staged = await call("stage", fresh);
   setBusy(null);
   for (const s of staged) state.items.push({ key: s.path, ...s, jobId: null, job: null });
   if (!state.sel && state.items.length) select(state.items[0].key);
   renderList();
-  updateButtons();
+  renderSettings();
 }
 
 function statusText(it) {
   if (it.error) return ["error", it.error];
   const j = it.job;
-  if (!j) return ["", `${fmtSize(it.size)} · ready`];
+  const dur = isVideo(it) && it.video ? ` · ${fmtTime(it.video.duration)} · ${+it.video.fps.toFixed(2)} fps` : "";
+  if (!j) return ["", `${fmtSize(it.size)}${dur} · ready`];
   if (j.status === "queued") return ["", "Waiting…"];
-  if (j.status === "running") return ["", `${j.stage || "Starting"} ${pct(j.progress)}`];
+  if (j.status === "running") {
+    const eta = j.eta != null && j.progress > 0.02 ? ` · ${fmtTime(j.eta)} left` : "";
+    return ["", `${j.stage || "Starting"} ${pct(j.progress)}${eta}`];
+  }
   if (j.status === "done") {
     const faces = j.faces != null ? ` · ${j.faces} face${j.faces === 1 ? "" : "s"}` : "";
-    return ["done", `${fmtSize(j.out_size)} · ${j.seconds}s${faces}`];
+    const fps = j.video && j.video.fps_out ? ` · ${+j.video.fps_out.toFixed(2)} fps` : "";
+    return ["done", `${fmtSize(j.out_size)}${fps} · ${fmtTime(j.seconds)}${faces}`];
   }
   if (j.status === "cancelled") return ["", "Cancelled"];
   return ["error", j.error || "Failed"];
@@ -190,7 +265,7 @@ async function removeItem(key) {
   if (it.jobId) await call("remove", it.jobId);
   state.items = state.items.filter((i) => i.key !== key);
   if (state.sel === key) { state.sel = null; if (state.items[0]) select(state.items[0].key); else showEmpty(); }
-  renderList(); updateButtons();
+  renderList(); renderSettings();
 }
 
 async function enhance() {
@@ -222,13 +297,13 @@ async function poll() {
   }
   renderList(); updateButtons();
   const s = selItem();
-  if (s && s.job && s.job.status === "running") $("stageInfo").textContent = `${s.job.stage} ${pct(s.job.progress)}`;
+  if (s && s.job && s.job.status === "running") $("stageInfo").textContent = statusText(s)[1];
   if (active) pollTimer = setTimeout(poll, 250);
 }
 
 function select(key) {
   state.sel = key;
-  renderList(); updateSizeText(); updateButtons();
+  renderList(); renderSettings();
   $("reasons").hidden = true;
   const it = selItem(); if (!it) return;
   $("stageTitle").textContent = it.name;
@@ -247,8 +322,8 @@ function showEmpty() {
   V.mode = "empty";
   $("viewerHint").hidden = false; $("divider").hidden = true; $("tagBefore").hidden = $("tagAfter").hidden = true;
   $("imgBefore").removeAttribute("src"); $("imgAfter").removeAttribute("src");
-  $("liveBar").hidden = true; $("clickTip").hidden = true;
-  $("stageTitle").textContent = "No photo selected"; $("stageInfo").textContent = "";
+  $("liveBar").hidden = true; $("clickTip").hidden = true; $("scrub").hidden = true;
+  $("stageTitle").textContent = "Nothing selected"; $("stageInfo").textContent = "";
 }
 
 function loadImages(beforeUrl, afterUrl, w, h) {
@@ -262,12 +337,24 @@ function loadImages(beforeUrl, afterUrl, w, h) {
   });
 }
 
-async function showOriginal(it) {
+function showScrub(it) {
+  const vid = isVideo(it) && it.video && it.video.duration > 0;
+  $("scrub").hidden = !vid;
+  $("clickTip").classList.toggle("raised", !!vid);
+  if (!vid) return;
+  $("scrubRange").value = Math.round((it.video.at / it.video.duration) * 1000);
+  $("scrubRange").style.setProperty("--p", `${$("scrubRange").value / 10}%`);
+  $("scrubTime").textContent = fmtTime(it.video.at);
+}
+
+async function showOriginal(it, at) {
   V.mode = "original"; V.live = null;
   $("viewerHint").hidden = true; $("liveBar").hidden = true;
   $("divider").hidden = true; $("tagBefore").hidden = $("tagAfter").hidden = true;
   $("stageInfo").textContent = it.size ? `${fmtSize(it.size)} · ${mp(it.size)}` : "";
-  const res = await call("original", it.path);
+  if (isVideo(it)) $("stageInfo").textContent += ` · ${fmtTime(it.video.duration)} · ${+it.video.fps.toFixed(2)} fps`;
+  showScrub(it);
+  const res = await call("original", it.path, at ?? null);
   if (state.sel !== it.key) return;
   await loadImages(res.url, null, res.size[0], res.size[1]);
   $("layerAfter").style.clipPath = "inset(0 0 0 100%)";
@@ -280,11 +367,13 @@ async function showCompare(it) {
   const res = await call("compare", it.jobId);
   if (!res.before || state.sel !== it.key) return;
   V.mode = "compare"; V.live = null;
-  $("viewerHint").hidden = true; $("liveBar").hidden = true; $("clickTip").hidden = true;
+  $("viewerHint").hidden = true; $("liveBar").hidden = true; $("clickTip").hidden = true; $("scrub").hidden = true;
   $("viewer").classList.remove("clickable");
   await loadImages(res.before, res.after, res.out_size[0], res.out_size[1]);
   $("divider").hidden = false; $("tagBefore").hidden = $("tagAfter").hidden = false;
-  $("stageInfo").textContent = `${fmtSize(res.in_size)} → ${fmtSize(res.out_size)} · ${it.job.seconds}s`;
+  const v = it.job.video;
+  const fps = v && v.fps_out ? ` · ${+v.fps_in.toFixed(2)} → ${+v.fps_out.toFixed(2)} fps · ${v.frames_out} frames` : "";
+  $("stageInfo").textContent = `${fmtSize(res.in_size)} → ${fmtSize(res.out_size)}${fps} · ${fmtTime(it.job.seconds)}`;
   fit();
 }
 
@@ -301,12 +390,12 @@ async function livePreview(cx, cy) {
   state.previewBusy = false; setBusy(null); updateButtons();
   if (res.error) { toast(res.error); return; }
   V.mode = "live"; V.live = { cx, cy };
-  $("viewerHint").hidden = true; $("clickTip").hidden = true;
+  $("viewerHint").hidden = true; $("clickTip").hidden = true; $("scrub").hidden = true;
   $("viewer").classList.remove("clickable");
   await loadImages(res.before, res.after, res.size[0], res.size[1]);
   $("divider").hidden = false; $("tagBefore").hidden = $("tagAfter").hidden = false;
   $("liveBar").hidden = false;
-  $("liveText").textContent = `Preview of one spot · ${res.seconds}s on ${res.device}`;
+  $("liveText").textContent = `Preview of one spot${isVideo(it) ? ` at ${fmtTime(it.video.at)}` : ""} · ${res.seconds}s on ${res.device}`;
   if (res.notice) showNotice(res.notice);
   V.fit = true; fit();
 }
@@ -390,10 +479,12 @@ function bindViewer() {
     if (b.dataset.zoom === "fit") fit(); else zoomTo(Number(b.dataset.zoom));
   });
   $("liveBack").addEventListener("click", () => { previewSeq++; const it = selItem(); if (it) showOriginal(it); });
+  $("scrub").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("scrub").addEventListener("wheel", (e) => e.stopPropagation());
   window.addEventListener("resize", () => (V.fit ? fit() : apply()));
   // hold B to see the whole "before" image, hold A for the whole "after" image
   window.addEventListener("keydown", (e) => {
-    if (e.repeat || !["compare", "live"].includes(V.mode) || e.target.tagName === "INPUT") return;
+    if (e.repeat || !["compare", "live"].includes(V.mode) || ["INPUT", "SELECT"].includes(e.target.tagName)) return;
     if (e.key === "b") { V._split = V.split; V.split = 1; apply(); }
     if (e.key === "a") { V._split = V.split; V.split = 0; apply(); }
   });
@@ -432,7 +523,7 @@ async function start() {
     const gone = new Set(await call("clear_finished"));
     state.items = state.items.filter((i) => !gone.has(i.jobId));
     if (!selItem()) { state.sel = null; if (state.items[0]) select(state.items[0].key); else showEmpty(); }
-    renderList(); updateButtons();
+    renderList(); renderSettings();
   });
   bindSettings(); bindViewer(); bindDrop();
   renderSettings(); renderList(); showEmpty();

@@ -29,6 +29,7 @@ from torch import nn  # noqa: E402
 
 from vendor.gfpganv1_clean_arch import GFPGANv1Clean  # noqa: E402
 from vendor.NAFNet_arch import NAFNet  # noqa: E402
+from vendor.rife_ifnet_arch import IFNet  # noqa: E402
 from vendor.rrdbnet_arch import RRDBNet  # noqa: E402
 from vendor.srvgg_arch import SRVGGNetCompact  # noqa: E402
 
@@ -44,6 +45,9 @@ LIC = {
     "gfpgan": {"license": "Apache-2.0", "project": "https://github.com/TencentARC/GFPGAN",
                "credit": "GFPGAN v1.4, Xintao Wang et al. (Tencent ARC)",
                "note": "Clean architecture only. Weights trained on FFHQ (CC BY-NC-SA 4.0 dataset)."},
+    "rife": {"license": "MIT", "project": "https://github.com/hzwer/Practical-RIFE",
+             "credit": "RIFE v4.25 frame interpolation, Zhewei Huang et al.",
+             "note": "Weights from the official Practical-RIFE 4.25 release (MIT, per its README)."},
     "yunet": {"license": "MIT", "project": "https://github.com/opencv/opencv_zoo",
               "credit": "YuNet face detector, OpenCV Zoo"},
 }
@@ -90,7 +94,26 @@ SPECS = {
                                                    decoder_load_path=None, fix_decoder=False, num_mlp=8,
                                                    input_is_latent=True, different_w=True, narrow=1,
                                                    sft_half=True)),
+    # frame interpolation: input (1,7,H,W) = frame A, frame B, time channel; H/W padded to the multiple
+    "rife-4.25": dict(kind="interp", scale=1, multiple=128, lic="rife", weights="rife-4.25.pkl", channels=7,
+                      source=GDRIVE.format("1ZKjcbmt1hypiFprJPIKW0Tt0lr_2i7bg"), build=lambda: IFNet(),
+                      wrap=lambda net: RifeWrap(net, (16, 8, 4, 2, 1))),
+    "rife-4.25-uhd": dict(kind="interp", scale=1, multiple=256, lic="rife", weights="rife-4.25.pkl", channels=7,
+                          source=GDRIVE.format("1ZKjcbmt1hypiFprJPIKW0Tt0lr_2i7bg"), build=lambda: IFNet(),
+                          wrap=lambda net: RifeWrap(net, (32, 16, 8, 4, 2))),
 }
+
+
+class RifeWrap(nn.Module):
+    """One input tensor like every other model: channels 0-2 frame A, 3-5 frame B, 6 the time (0..1).
+    The UHD variant runs the flow at half resolution (Practical-RIFE's --scale 0.5) for 4K frames."""
+
+    def __init__(self, net, scales):
+        super().__init__()
+        self.net, self.scales = net, scales
+
+    def forward(self, x):
+        return self.net(x[:, 0:3], x[:, 3:6], x[:, 6:7], self.scales)
 
 
 class NoPad(nn.Module):
@@ -130,16 +153,20 @@ def load_state(path: Path) -> dict:
     for key in ("params_ema", "params", "state_dict"):
         if isinstance(state, dict) and key in state:
             return state[key]
-    return state
+    # RIFE: DataParallel prefix; the training-only teacher and caltime blocks are not part of inference
+    return {k.removeprefix("module."): v for k, v in state.items() if not k.removeprefix("module.").startswith(("teacher.", "caltime."))}
 
 
-def test_input(size: int) -> np.ndarray:
+def test_input(size: int, channels: int = 3) -> np.ndarray:
     """A smooth image-like tile (gradients + edges + mild noise) so fp16 is tested on realistic values."""
     yy, xx = np.mgrid[0:size, 0:size] / size
     rgb = np.stack([xx, yy, (np.sin(xx * 20) * np.cos(yy * 13) + 1) / 2])
     rgb[:, size // 3: size // 2, :] *= 0.2
     rgb += np.random.default_rng(0).normal(0, 0.03, rgb.shape)
-    return np.clip(rgb, 0, 1)[None].astype(np.float32)
+    rgb = np.clip(rgb, 0, 1)
+    if channels == 7:  # two frames 6px apart + time 0.5
+        rgb = np.concatenate([rgb, np.roll(rgb, 6, axis=2), np.full((1, size, size), 0.5)])
+    return rgb[None].astype(np.float32)
 
 
 def run_ort(path: Path, x: np.ndarray) -> np.ndarray:
@@ -155,11 +182,14 @@ def convert(mid: str, spec: dict, weights_dir: Path, fp16: bool = False) -> dict
         net = NoPad(net)
     if spec["kind"] == "face":
         net = FaceWrap(net)
+    if "wrap" in spec:
+        net = spec["wrap"](net)
     net.eval()
 
     fixed = spec.get("fixed")
-    size = fixed or 64
-    x = test_input(size)
+    channels = spec.get("channels", 3)
+    size = fixed or max(64, spec["multiple"])
+    x = test_input(size, channels)
     with torch.no_grad():
         ref = net(torch.from_numpy(x)).numpy()
 
@@ -182,12 +212,14 @@ def convert(mid: str, spec: dict, weights_dir: Path, fp16: bool = False) -> dict
         msg += f"  fp16 diff {diff16:.2e}"
 
     if not fixed:  # dynamic shapes really work: a non-square size gives the right output size
-        h, w = 48, 80
-        y = run_ort(out32, np.zeros((1, 3, h, w), np.float32))
+        h, w = (48, 80) if spec["multiple"] < 48 else (spec["multiple"], spec["multiple"] * 2)
+        y = run_ort(out32, np.zeros((1, channels, h, w), np.float32))
         assert y.shape == (1, 3, h * spec["scale"], w * spec["scale"]), y.shape
 
     print(msg, flush=True)
     entry = {k: spec[k] for k in ("kind", "scale", "multiple")}
+    if channels != 3:
+        entry["channels"] = channels
     if fixed:
         entry["fixed"] = fixed
     entry.update(source=spec["source"], weights_sha256=sha256(wpath), **LIC[spec["lic"]])
