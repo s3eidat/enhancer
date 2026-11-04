@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 from enhancer import APP_NAME, __version__  # noqa: E402
 
 bindir = ROOT / "bin" / "win"
-helpers = ["ffmpeg.exe", "ffprobe.exe"]
+helpers = ["ffmpeg.exe", "ffprobe.exe", "ffmpeg-LICENSE.txt", "ffmpeg-README.txt"]
 missing = [h for h in helpers if not (bindir / h).exists()]
 if missing:
     raise SystemExit(f"Missing {missing} in {bindir} (run build_windows.ps1)")

@@ -367,7 +367,8 @@
   function fit() {
     if (!V.w) return;
     var vw = $("view").clientWidth, vh = $("view").clientHeight;
-    V.zoom = Math.min(vw / V.w, vh / V.h, V.mode === "live" ? 4 : 1);
+    // small pictures and spot previews fill the view; big ones stop at 100%
+    V.zoom = Math.min(vw / V.w, vh / V.h, V.mode === "live" ? 4 : Math.max(1, 480 / Math.max(V.w, V.h)));
     V.x = (vw - V.w * V.zoom) / 2; V.y = (vh - V.h * V.zoom) / 2; V.fit = true;
     apply();
   }
@@ -494,7 +495,12 @@
     diff /= 96 * 64 * 2;
     return diff < 12 ? true : "model output is off by " + diff.toFixed(1);
   };
-  window.S3_DEMO = async function () { if (!items.length) await addFiles([await sampleFile()]); };
+  window.S3_DEMO = async function () {
+    if (items.length) return;
+    await addFiles([await sampleFile()]);
+    await ready;
+    await enhanceAll();
+  };
 
   /* ---------- start ---------- */
   bindSettings(); bindViewer();

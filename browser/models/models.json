@@ -47,10 +47,10 @@
       "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
       "project": "https://github.com/megvii-research/NAFNet",
       "file": "nafnet-denoise-32.onnx",
-      "bytes": 59067870,
-      "sha256": "89397f560b286fa4843b7b8bd6bc121c5ee6b1c077e10a7c5d40f0a12fe20d1e",
+      "bytes": 31122374,
+      "sha256": "b1f99628c9d13f6dc79dcf53252d64584bfa5a07e4f9c00c132a607a60563da6",
       "channels": 3,
-      "max_diff_vs_fp32": 0.0002301335334777832
+      "max_diff_vs_fp32": 0.010908544063568115
     },
     "nafnet-deblur-32": {
       "kind": "sharpen",
@@ -60,10 +60,10 @@
       "credit": "NAFNet, Liangyu Chen et al. (Megvii)",
       "project": "https://github.com/megvii-research/NAFNet",
       "file": "nafnet-deblur-32.onnx",
-      "bytes": 34988470,
-      "sha256": "9831068405799d5975c8c065a6f16ff42c86bc577d23750db6704ec62e07fc03",
+      "bytes": 18718018,
+      "sha256": "495ae25e834df79c82f3084c47919e2e113fd4a2647ba05e7d44a3c616fa0315",
       "channels": 3,
-      "max_diff_vs_fp32": 0.00033588707447052
+      "max_diff_vs_fp32": 0.009408771991729736
     }
   }
 }

@@ -81,12 +81,12 @@ async function session(id, onBytes) {
   var bytes = await modelBytes(id, onBytes);
   var sess;
   try {
-    sess = await ort.InferenceSession.create(bytes, { executionProviders: [device], graphOptimizationLevel: "all" });
+    sess = await ort.InferenceSession.create(bytes, { executionProviders: [device], graphOptimizationLevel: "all", logSeverityLevel: 3 });
   } catch (e) {
     if (device !== "webgpu") throw e;
     device = "wasm";
     notice = "Your GPU could not run this model, so it runs on the CPU (slower).";
-    sess = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    sess = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"], graphOptimizationLevel: "all", logSeverityLevel: 3 });
   }
   sessions.push({ id: id, dev: device, sess: sess });
   while (sessions.length > 2) { var old = sessions.shift(); try { old.sess.release(); } catch (e) { /* already gone */ } }

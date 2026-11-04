@@ -19,7 +19,7 @@ for its own files.
 - The output is capped at 64 MP and 16384 px per side (a browser tab cannot hold more), so very large photos need 2× or Off.
 - Without WebGPU (older browsers, some phones) it runs on one CPU core and is slow for big photos.
 - Each model downloads from this page the first time you use it: Fast 2.5 MB, Photo 34 MB, Art 9 MB,
-  Noise 59 MB, Sharpen 35 MB. They are kept in your browser for next time.
+  Noise 31 MB, Sharpen 19 MB. They are kept in your browser for next time.
 
 ## Models and licenses
 
@@ -30,5 +30,5 @@ for its own files.
 | NAFNet GoPro width 32 | sharpen | MIT, github.com/megvii-research/NAFNet |
 | onnxruntime-web 1.30.0 | runs the models | MIT, github.com/microsoft/onnxruntime |
 
-The model files are the official weights converted to ONNX, with weights stored as 16-bit floats and the maths in
-32-bit (checked against the full model: largest pixel difference below 0.2%).
+The model files are the official weights converted to ONNX, with weights stored in 16 bits (8 bits for the two
+NAFNets) and the maths in 32-bit, checked against the full model.

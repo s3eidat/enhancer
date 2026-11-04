@@ -34,6 +34,10 @@ foreach ($exe in @("ffmpeg.exe", "ffprobe.exe")) {
     if (-not (Test-Path $dst) -or (Get-Item $src).Length -ne (Get-Item $dst).Length) { Copy-Item $src $dst -Force }
 }
 
+$ffRoot = Split-Path $FfmpegDir -Parent
+Copy-Item (Join-Path $ffRoot "LICENSE") "bin\win\ffmpeg-LICENSE.txt" -Force
+Copy-Item (Join-Path $ffRoot "README.txt") "bin\win\ffmpeg-README.txt" -Force
+
 Step "Drawing the icon"
 & $py -I tools\make_icon.py
 if ($LASTEXITCODE -ne 0) { throw "icon failed" }
@@ -48,6 +52,8 @@ Step "Building with PyInstaller (one-folder)"
 Get-Process $name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 & $py -m PyInstaller --noconfirm --clean --log-level WARN Enhancer.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+
+Copy-Item "LICENSE", "THIRD-PARTY-NOTICES.md" "dist\$name\" -Force
 
 Step "Zipping"
 New-Item -ItemType Directory -Force "release" | Out-Null

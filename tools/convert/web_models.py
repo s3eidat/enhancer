@@ -1,8 +1,10 @@
-"""Make the browser copies of the models: weights stored as fp16 (half the download), maths still in fp32.
+"""Make the browser copies of the models: smaller stored weights, maths still in fp32.
 
-Each large fp32 weight becomes an fp16 initializer plus a Cast back to fp32, so the network computes exactly as
-before with weights rounded to fp16. (Converting the whole graph to fp16 broke NAFNet on DirectML; this does not
-touch the activations.) The result is checked against the fp32 model on the CPU.
+Each large fp32 weight is stored smaller and expanded back to fp32 by a few nodes that run once at load, so the
+network computes as before with rounded weights. (Converting the whole graph to fp16 broke NAFNet on DirectML; this
+does not touch the activations.) Most models store fp16. The two NAFNets store 8 bits per weight with a range per
+output channel, which keeps the tool under the S3eidat Tools size cap (77 dB and 61 dB against fp32 on a real photo
+crop; the Photo model only reached 45 dB, so it stays fp16). Each result is checked against the fp32 model on the CPU.
 
     .venv/Scripts/python -I tools/convert/web_models.py [--out browser/models]
 """
@@ -20,6 +22,7 @@ from onnx import TensorProto, helper, numpy_helper
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ["realesr-general-x4", "realesrgan-x4", "realesrgan-anime-x4", "nafnet-denoise-32", "nafnet-deblur-32"]
+U8_STORAGE = {"nafnet-denoise-32", "nafnet-deblur-32"}
 MIN_ELEMS = 1024  # small tensors (biases, norms) stay fp32: no size gain, and they are the sensitive ones
 
 
@@ -43,6 +46,31 @@ def fp16_storage(model: onnx.ModelProto) -> onnx.ModelProto:
     return model
 
 
+def u8_storage(model: onnx.ModelProto) -> onnx.ModelProto:
+    g = model.graph
+    keep, nodes = [], []
+    for init in g.initializer:
+        if init.data_type != TensorProto.FLOAT or np.prod(init.dims) < MIN_ELEMS:
+            keep.append(init)
+            continue
+        a, n = numpy_helper.to_array(init), init.name
+        axes = tuple(range(1, a.ndim))
+        lo = a.min(axis=axes, keepdims=True)
+        step = np.maximum(a.max(axis=axes, keepdims=True) - lo, 1e-12) / 255
+        keep += [numpy_helper.from_array(np.round((a - lo) / step).astype(np.uint8), n + "__u8"),
+                 numpy_helper.from_array(step.astype(np.float32), n + "__step"),
+                 numpy_helper.from_array(lo.astype(np.float32), n + "__lo")]
+        nodes += [helper.make_node("Cast", [n + "__u8"], [n + "__f"], to=TensorProto.FLOAT),
+                  helper.make_node("Mul", [n + "__f", n + "__step"], [n + "__m"]),
+                  helper.make_node("Add", [n + "__m", n + "__lo"], [n])]
+    del g.initializer[:]
+    g.initializer.extend(keep)
+    old = list(g.node)
+    del g.node[:]
+    g.node.extend(nodes + old)
+    return model
+
+
 def sha256(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
@@ -60,7 +88,8 @@ def main() -> None:
         info = manifest[mid]
         src = ROOT / "models" / info["files"]["fp32"]["file"]
         dst = out / f"{mid}.onnx"
-        onnx.save(fp16_storage(onnx.load(str(src))), str(dst))
+        store = u8_storage if mid in U8_STORAGE else fp16_storage
+        onnx.save(store(onnx.load(str(src))), str(dst))
         ch = info.get("channels", 3)
         size = max(64, info["multiple"])
         yy, xx = np.mgrid[0:size, 0:size] / size

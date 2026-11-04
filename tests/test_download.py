@@ -66,3 +66,9 @@ def test_real_manifest_lists_every_download_id():
     cat = Catalog()
     for mid in download.ESSENTIAL + download.BEST:
         assert mid in cat.models, mid
+
+
+def test_model_left_out_of_the_manifest_is_simply_not_offered(served):
+    cat, _, _ = served
+    assert download.missing(cat, ["gfpgan-1.4"]) == [] and download.size_of(cat, ["gfpgan-1.4"]) == 0
+    assert not cat.available("gfpgan-1.4")

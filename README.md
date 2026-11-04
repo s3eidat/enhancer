@@ -3,7 +3,7 @@
 A free, private AI photo and video enhancer that runs on your own GPU: upscale 2×/4×, remove noise, sharpen/deblur,
 recover faces, and make video smoother (2×/4×/60/120 fps) or slow motion, with a batch queue, a live spot preview
 and a before/after slider. Nothing leaves the PC. There is also a browser version for S3eidat Tools (`browser/`).
-Local repo only: not published anywhere.
+MIT licensed; third-party licenses are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Run (Windows)
 Double-click `Run Enhancer.bat`, or:
@@ -25,7 +25,8 @@ Gives `dist\S3eidat Enhancer\S3eidat Enhancer.exe` and `release\S3eidat-Enhancer
 included). The models are not in the zip: on first start the app offers to download them (389 MB essential,
 +1.1 GB for best-quality noise/sharpen and faces), checks each SHA-256 against `models/manifest.json`, and keeps
 them in `%LOCALAPPDATA%\S3eidat Enhancer\models`. They download from `download.MODEL_URL`
-(a GitHub release that does not exist yet; set `ENHANCER_MODEL_URL` to test with any folder served over HTTP).
+(the `models-v1` GitHub release; set `ENHANCER_MODEL_URL` to test with any folder served over HTTP).
+`tools/publish_release.py` checks everything in a dry run and publishes only with `--go`.
 
 ## Browser version (S3eidat Tools)
 ```
@@ -33,7 +34,8 @@ them in `%LOCALAPPDATA%\S3eidat Enhancer\models`. They download from `download.M
 ```
 Then serve `browser\` (launch config `enhancer-web`, port 7771). onnxruntime-web 1.30.0 on WebGPU, WASM fallback.
 Photos only: upscale (Photo / Art / Fast), remove noise, sharpen, spot preview, compare view, batch + zip.
-Models are fp16-stored, fp32-computed copies (`tools/convert/web_models.py`, max pixel diff vs fp32 < 0.2%).
+Models store smaller weights (16 bits, 8 for the two NAFNets) with fp32 maths (`tools/convert/web_models.py`).
+`tools/stage_site_tool.py <S3eidat-Tools folder>` installs it as `repos/ai-enhancer` (122 MB, under the 130 MiB cap).
 
 ## Setup from scratch
 ```
@@ -63,20 +65,20 @@ we use only the clean v1.4 architecture, which has neither. The weights were tra
 dataset, a grey area every face model shares. Decide before shipping face recovery publicly. The browser version
 has no face recovery.
 CodeFormer is deliberately not used (non-commercial license). No Topaz code, models, assets or branding are used.
-The bundled ffmpeg is the GPL "full" build from gyan.dev, which means GPL obligations (offer its source) when the
-zip is distributed.
+The bundled ffmpeg is the GPL v3 "full" build from gyan.dev; the zip carries its license, and the release carries
+its source.
 
-## What is tested (3 Nov 2026, Omar's PC: RTX 3050 8 GB, Windows 11, Python 3.11)
+## What is tested (3 Nov 2026, the development PC: RTX 3050 8 GB, Windows 11, Python 3.11)
 - 64 automated tests pass: seamless tiling, settings, pipeline order and strength blending,
   EXIF/ICC/orientation/alpha/16-bit/non-ASCII paths, queue order + failure isolation + cancel, noise estimator,
   real-model upscale/denoise, GPU output == CPU output for the photo models, video frame-rate maths, scene-cut
   detection, real video runs (upscale + 2× fps with audio, slow motion, cancel leaves no partial file), and the
   model downloader (checksum mismatch is not saved, cancel).
 - Every ONNX model matches PyTorch (max abs diff ≤ 1e-5; RIFE 5.5e-6, RIFE UHD 7.9e-5). RIFE GPU == CPU (6.6e-6).
-- Photos from this PC through the UI (browser dev mode, same UI and API as the window):
+- Photos through the UI (browser dev mode, same UI and API as the window):
   - 960×1280 WhatsApp photo, 2× + denoise 50%: 6.6 s. With face recovery (CLI): 11 s, face restored, no seam.
   - 2272×1704 Canon photos, 2×: ~19 s each. 24 MP iPhone photo (5712×4284), 2× + denoise: 203 s, 98 MP out.
-- Videos from this PC:
+- Real videos:
   - 4 s 360p phone clip, 4× Fast + 2× fps (CLI): 1440×2560 48 fps with audio, 109 s. Real scene cut detected.
   - Same clip, 2× + denoise + 2× fps through the queue UI: 122 s, sound kept.
   - 4 s 1080×1920 clip, 24 → 60 fps, H.265 (NVENC): 64 s.
@@ -84,7 +86,7 @@ zip is distributed.
     a plain blend).
 - Browser version (preview browser, WebGPU on the RTX 3050): self-test passes (tiling maths + a real model run),
   960×1280 photo 2× Photo model + denoise: 75 s including the first model download; CPU-only mode works; no
-  horizontal scroll at phone width; the S3eidat Tools check.py rules pass except the repo size cap (below).
+  horizontal scroll at phone width; the S3eidat Tools sync, check and smoke scripts pass on a scratch copy.
 - Packaged app (`dist\S3eidat Enhancer`): starts on the GPU, finds its bundled ffmpeg, first-run model download
   from a local test server, then a 360p video job (2× + 2× fps, sound kept, NVENC) in 72 s using its bundled
   ffmpeg; the packaged window opens and loads the UI on the GPU (log).
@@ -93,10 +95,8 @@ zip is distributed.
 - The native window itself was not clicked through (screen access was declined): native file picker, folder
   picker and drag-and-drop from Explorer. The same UI and API work in the browser test, and the window loads the UI
   on the GPU (checked through the app log). The packaged exe was tested in its `--browser` mode for the same reason.
-- The model download URL is a placeholder until the models are published (needs Omar's OK).
-- Browser version: 166 MB with all five models, over the S3eidat Tools 130 MB per-repo cap. Fix at publish time:
-  put the models in their own same-origin repo (one line, `MODEL_BASE` in `browser/worker.js`), or drop one model.
-  The Photo model is slow on WebGPU (~3–5 s per 256 px tile on the RTX 3050, 5–7× slower than DirectML).
+- Tested on one PC only. The Windows exe is not code-signed, so Windows may warn about an unknown publisher.
+- Browser version: the Photo model is slow on WebGPU (~3–5 s per 256 px tile on the RTX 3050, 5–7× slower than DirectML).
 - Video: 8-bit SDR pipeline (10-bit sources keep 10 bits only with H.265/ProRes); HDR (PQ/HLG) is not converted
   and will look washed out; variable frame rate is converted to constant; subtitles are not copied.
 - Video face recovery runs per frame and can shimmer, so Autopilot keeps it at 50% or less for video.
@@ -110,4 +110,4 @@ zip is distributed.
 ## Layout
 `enhancer/` app (runtime, tiling, ops, faces, pipeline, autopilot, video, download, jobs, server, app, web UI) ·
 `browser/` S3eidat Tools version · `tools/convert/` weight conversion + web models · `models/manifest.json`
-sources, hashes, licenses · `Enhancer.spec` + `build_windows.ps1` packaging · `docs/superpowers/` spec, plan · `tests/`.
+sources, hashes, licenses · `Enhancer.spec` + `build_windows.ps1` packaging · `tools/publish_release.py` releases · `docs/superpowers/` spec, plan · `tests/`.
