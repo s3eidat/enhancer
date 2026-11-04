@@ -86,6 +86,7 @@ its source.
     a plain blend).
 - Browser version (preview browser, WebGPU on the RTX 3050): self-test passes (tiling maths + a real model run),
   960×1280 photo 2× Photo model + denoise: 75 s including the first model download; CPU-only mode works; no
+  noise + sharpen + Fast 2× with the final smaller models: 20.5 s, no console errors; no
   horizontal scroll at phone width; the S3eidat Tools sync, check and smoke scripts pass on a scratch copy.
 - Packaged app (`dist\S3eidat Enhancer`): starts on the GPU, finds its bundled ffmpeg, first-run model download
   from a local test server, then a 360p video job (2× + 2× fps, sound kept, NVENC) in 72 s using its bundled
